@@ -974,18 +974,35 @@ function spawnEnemySprite(e) {
   // DOM: emoji + name label floating over the canvas
   const domLabel = createEnemyDOMLabel(e);
   moveEnemyDOMLabel(domLabel, e.x, e.y);
+  // Enable CSS transition after initial placement so spawn doesn't animate from 0,0
+  requestAnimationFrame(() => {
+    if (domLabel.parentNode) domLabel.style.transition = 'left 110ms linear, top 110ms linear';
+  });
 
-  enemiesOnCanvas[e.id] = { g, domLabel, barBg, barFill, barW, size, isBoss, type: e.type };
+  enemiesOnCanvas[e.id] = { g, domLabel, barBg, barFill, barW, size, isBoss, type: e.type, moveTween: null };
 }
 
 function moveEnemySprite(e) {
   const obj = enemiesOnCanvas[e.id];
   if (!obj) return;
-  obj.g.setPosition(e.x, e.y);
-  obj.barBg.setPosition(e.x, e.y);
-  obj.barFill.setPosition(e.x, e.y);
+
+  // HP bar updates immediately — no need to interpolate health
   drawHpBar(obj.barFill, e.hp, e.maxHp, obj.barW, obj.size);
+
+  // DOM label: CSS transition on left/top handles smoothing
   moveEnemyDOMLabel(obj.domLabel, e.x, e.y);
+
+  // Canvas objects: stop previous movement tween (object stays at current
+  // interpolated position) then tween to new server position
+  if (obj.moveTween) { obj.moveTween.stop(); obj.moveTween = null; }
+  obj.moveTween = scene.tweens.add({
+    targets: [obj.g, obj.barBg, obj.barFill],
+    x: e.x,
+    y: e.y,
+    duration: 110,
+    ease: 'Linear',
+    onComplete: () => { obj.moveTween = null; },
+  });
 }
 
 function drawHpBar(g, hp, maxHp, barW, size) {
@@ -999,6 +1016,7 @@ function drawHpBar(g, hp, maxHp, barW, size) {
 function removeEnemy(enemyId) {
   const obj = enemiesOnCanvas[enemyId];
   if (!obj) return;
+  if (obj.moveTween) { obj.moveTween.stop(); obj.moveTween = null; }
   obj.g.destroy();
   obj.barBg.destroy();
   obj.barFill.destroy();
