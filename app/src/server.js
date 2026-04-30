@@ -46,6 +46,11 @@ io.on('connection', (socket) => {
     if (!result.ok) socket.emit('error_msg', result.error);
   });
 
+  socket.on('set_speed', ({ multiplier }) => {
+    const result = engine.setSpeedByHost(socket.id, multiplier);
+    if (!result.ok) socket.emit('error_msg', result.error);
+  });
+
   socket.on('place_tower', (data, callback) => {
     const result = engine.placeTower(socket.id, data);
     if (callback) callback(result);

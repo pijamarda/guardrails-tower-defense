@@ -132,7 +132,7 @@
 
      /* RIGHT: sidebar */
      #sidebar {
-       width: 320px;
+       width: 300px;
        background: #0d0d18;
        border-left: 2px solid #1a1a2e;
        display: flex;
@@ -141,47 +141,46 @@
      }
      #sidebar-header {
        background: #0a0a14;
-       padding: 12px 16px;
+       padding: 5px 10px;
        border-bottom: 1px solid #1a1a2e;
-        font-size: 0.82rem;
-        color: #7ab8d4;
-        letter-spacing: 2px;
-      }
+       font-size: 0.62rem;
+       color: #3a6a8a;
+       letter-spacing: 2px;
+     }
      #status-bar {
        display: flex;
        justify-content: space-between;
-       padding: 12px 16px;
+       padding: 7px 12px;
        background: #111;
        border-bottom: 1px solid #1a1a2e;
-       font-size: 0.95rem;
+       font-size: 0.9rem;
      }
      .stat { text-align: center; }
-     .stat-val { font-size: 1.4rem; font-weight: bold; color: #00ff88; }
-     .stat-lbl { font-size: 0.75rem; color: #7ab8d4; letter-spacing: 1px; }
+     .stat-val { font-size: 1.2rem; font-weight: bold; color: #00ff88; }
+     .stat-lbl { font-size: 0.65rem; color: #7ab8d4; letter-spacing: 1px; }
      #lives-val { color: #ff4444; }
      #wave-val { color: #ffaa00; }
 
      /* Tower shop */
      #tower-shop {
-       padding: 10px;
+       padding: 6px 8px;
        border-bottom: 1px solid #1a1a2e;
-       overflow-y: auto;
-       max-height: 380px;
+       flex-shrink: 0;
      }
-     #tower-shop h3 { font-size: 0.82rem; color: #7ab8d4; letter-spacing: 2px; margin-bottom: 8px; padding-left: 4px; }
+     #tower-shop h3 { font-size: 0.72rem; color: #7ab8d4; letter-spacing: 2px; margin-bottom: 5px; padding-left: 2px; }
      .tower-btn {
        display: flex;
        align-items: center;
-       gap: 10px;
+       gap: 7px;
        width: 100%;
        background: #111;
        border: 1px solid #1a1a2e;
        color: #c8dce8;
        font-family: 'Courier New', monospace;
-       font-size: 0.9rem;
-       padding: 8px 10px;
+       font-size: 0.8rem;
+       padding: 4px 7px;
        cursor: pointer;
-       margin-bottom: 5px;
+       margin-bottom: 3px;
        transition: border-color 0.15s, background 0.15s;
        text-align: left;
      }
@@ -189,33 +188,33 @@
      .tower-btn.selected { border-color: #00ff88; background: #0a1a12; color: #00ff88; }
      .tower-btn.cant-afford { opacity: 0.4; cursor: not-allowed; }
      .tower-icon {
-       width: 34px; height: 34px;
+       width: 24px; height: 24px;
        display: flex; align-items: center; justify-content: center;
-       font-size: 0.78rem; font-weight: bold;
+       font-size: 15px;
        flex-shrink: 0;
        border-radius: 2px;
      }
-     .tower-info { flex: 1; }
-     .tower-name { font-weight: bold; font-size: 0.9rem; }
-     .tower-meta { color: #6ec8a8; font-size: 0.78rem; margin-top: 2px; }
-     .tower-cost { color: #ffcc00; font-size: 0.9rem; font-weight: bold; }
+     .tower-info { flex: 1; min-width: 0; }
+     .tower-name { font-weight: bold; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+     .tower-meta { color: #6ec8a8; font-size: 0.7rem; }
+     .tower-cost { color: #ffcc00; font-size: 0.82rem; font-weight: bold; flex-shrink: 0; }
 
      /* Leaderboard */
      #leaderboard {
        flex: 1;
-       padding: 10px;
+       padding: 8px;
        overflow-y: auto;
      }
-     #leaderboard h3 { font-size: 0.82rem; color: #7ab8d4; letter-spacing: 2px; margin-bottom: 8px; padding-left: 4px; }
+     #leaderboard h3 { font-size: 0.75rem; color: #7ab8d4; letter-spacing: 2px; margin-bottom: 6px; padding-left: 2px; }
      .player-row {
        display: flex;
        justify-content: space-between;
        align-items: center;
-       padding: 6px 8px;
-       margin-bottom: 4px;
+       padding: 4px 7px;
+       margin-bottom: 3px;
        background: #111;
        border: 1px solid #1a1a2e;
-       font-size: 0.88rem;
+       font-size: 0.82rem;
      }
      .player-row.me { border-color: #00ff88; }
      .player-name { color: #e8eef4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
@@ -306,14 +305,24 @@
 
     /* Phase indicator */
      #phase-indicator {
-       padding: 6px 14px;
-       font-size: 0.7rem;
+       padding: 5px 10px;
+       font-size: 0.68rem;
        letter-spacing: 2px;
        background: #111;
        border-bottom: 1px solid #1a1a2e;
        color: #7ab8d4;
+       display: flex;
+       align-items: center;
+       justify-content: space-between;
      }
      #phase-indicator span { color: #ffaa00; }
+     #speed-indicator {
+       font-size: 0.68rem;
+       font-weight: bold;
+       padding: 1px 6px;
+       border: 1px solid currentColor;
+       display: none;
+     }
 
      /* Tooltip */
      #tower-tooltip {
@@ -421,16 +430,19 @@
    </div>
 
   <div id="sidebar">
-    <div id="sidebar-header">GUARDRAIL TD // CLOUD DEFENSE</div>
+    <div id="sidebar-header">▮ GUARDRAIL TD</div>
 
     <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
 
-    <div id="phase-indicator">PHASE: <span id="phase-text">LOBBY</span></div>
+    <div id="phase-indicator">
+      <span>PHASE: <span id="phase-text">LOBBY</span></span>
+      <span id="speed-indicator"></span>
+    </div>
 
     <!-- Wave preview — shown during planning, right under the phase bar -->
-    <div id="wave-preview" style="display:none;padding:6px 8px;border-bottom:1px solid #1a1a2e;background:#0a0f0a;">
-      <div style="font-size:0.65rem;color:#ffaa00;letter-spacing:2px;margin-bottom:4px;">⚠ INCOMING ENEMIES</div>
-      <div id="wave-preview-list" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+    <div id="wave-preview" style="display:none;padding:5px 8px;border-bottom:1px solid #1a1a2e;background:#0a0f0a;">
+      <div id="wave-preview-header" style="font-size:0.62rem;color:#ffaa00;letter-spacing:2px;margin-bottom:4px;">⚠ INCOMING ENEMIES</div>
+      <div id="wave-preview-list" style="display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;"></div>
     </div>
 
     <div id="status-bar">
@@ -467,6 +479,7 @@
         <button class="host-btn" id="btn-start" style="display:none">▶ START GAME</button>
         <button class="host-btn" id="btn-skip-planning" style="display:none">⚡ LAUNCH WAVE</button>
         <button class="host-btn" id="btn-next-wave" style="display:none">▶ NEXT WAVE</button>
+        <button class="host-btn" id="btn-speed" style="display:none">▶ SPEED: 1×</button>
         <button class="host-btn danger" id="btn-reset" style="display:none">↺ RESET GAME</button>
       </div>
     </div>

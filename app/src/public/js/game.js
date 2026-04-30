@@ -40,6 +40,57 @@ const DOMAIN_COLORS = {
   'GRC':             '#00cc66',
 };
 
+// ── Sound System (Web Audio API) ──────────────
+let _audioCtx = null;
+function _audio() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+function _beep(freq, type, dur, vol = 0.15) {
+  try {
+    const ctx = _audio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur + 0.05);
+  } catch(_) {}
+}
+
+const _shotThrottle = {};
+function soundShot(domain) {
+  const now = Date.now();
+  if (now - (_shotThrottle[domain] || 0) < 180) return;
+  _shotThrottle[domain] = now;
+  const sounds = {
+    'Network':         () => _beep(880, 'square',   0.06, 0.10),
+    'Data Protection': () => _beep(440, 'sine',     0.09, 0.10),
+    'IAM':             () => _beep(660, 'sawtooth', 0.06, 0.08),
+    'GRC':             () => _beep(550, 'triangle', 0.08, 0.10),
+  };
+  (sounds[domain] || sounds['Network'])();
+}
+function soundKill(isBoss) {
+  if (isBoss) {
+    _beep(220, 'sawtooth', 0.35, 0.3);
+    setTimeout(() => _beep(110, 'sawtooth', 0.45, 0.22), 110);
+    setTimeout(() => _beep(440, 'sine',     0.18, 0.12), 230);
+  } else {
+    _beep(320, 'square', 0.10, 0.16);
+  }
+}
+function soundLifeLost() {
+  _beep(160, 'square', 0.22, 0.38);
+  setTimeout(() => _beep(110, 'square', 0.22, 0.38), 220);
+}
+function soundWaveClear() {
+  [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => _beep(f, 'sine', 0.28, 0.18), i * 100));
+}
+
 // ── State ──────────────────────────────────────
 const socket = io();
 let myId = null;
@@ -112,9 +163,13 @@ socket.on('tower_shot', (data) => {
 });
 
 socket.on('enemy_killed', ({ enemyId, enemyName, enemyType, isBoss, description, killerOwner, reward, share, players }) => {
-  if (gameScene) gameScene.removeEnemy(enemyId);
+  if (gameScene) {
+    gameScene.spawnDeathParticles(enemyId, enemyType, isBoss);
+    gameScene.removeEnemy(enemyId);
+  }
   if (players) updatePlayers(players);
   addKillFeedEntry({ enemyName, enemyType, isBoss, description, killerOwner, share });
+  soundKill(isBoss);
 });
 
 socket.on('enemy_reached_end', ({ enemyId, livesLeft }) => {
@@ -122,6 +177,7 @@ socket.on('enemy_reached_end', ({ enemyId, livesLeft }) => {
   if (gameState) gameState.lives = livesLeft;
   document.getElementById('lives-val').textContent = livesLeft;
   if (gameScene) gameScene.flashLives();
+  soundLifeLost();
 });
 
 socket.on('wave_cleared', ({ waveNumber, theme, teachingMoment, players, lives, score }) => {
@@ -131,6 +187,7 @@ socket.on('wave_cleared', ({ waveNumber, theme, teachingMoment, players, lives, 
   document.getElementById('lives-val').textContent = lives;
   showOverlay(`WAVE ${waveNumber} CLEARED`, teachingMoment, players, true);
   updateHostButtons();
+  soundWaveClear();
 });
 
 socket.on('game_over', ({ victory, score, leaderboard }) => {
@@ -147,6 +204,12 @@ socket.on('game_reset', (state) => {
   hideOverlay();
   syncUI();
   if (gameScene) gameScene.resetScene(state);
+});
+
+socket.on('speed_changed', ({ speedMultiplier }) => {
+  if (gameState) gameState.speedMultiplier = speedMultiplier;
+  updateSpeedIndicator(speedMultiplier);
+  updateSpeedButton(speedMultiplier);
 });
 
 socket.on('error_msg', (msg) => {
@@ -234,6 +297,13 @@ function updatePhaseUI(phase, endsAt, waveNumber, theme) {
     bar.style.background = phase === 'wave' ? '#ff4444' : '#00ff88';
   }
 
+  // Show/hide tower shop based on phase
+  document.getElementById('tower-shop').style.display = (phase === 'planning') ? '' : 'none';
+
+  // Sync speed indicator for all players
+  const speed = gameState?.speedMultiplier || 1;
+  updateSpeedIndicator(speed);
+
   updateHostButtons();
 }
 
@@ -258,34 +328,60 @@ function updateHostButtons() {
   document.getElementById('btn-start').style.display         = phase === 'lobby'    ? 'block' : 'none';
   document.getElementById('btn-skip-planning').style.display = phase === 'planning' ? 'block' : 'none';
   document.getElementById('btn-next-wave').style.display     = phase === 'waveover' ? 'block' : 'none';
+  document.getElementById('btn-speed').style.display         = phase === 'wave'     ? 'block' : 'none';
   document.getElementById('btn-reset').style.display         = phase !== 'lobby'    ? 'block' : 'none';
+
+  if (phase === 'wave') updateSpeedButton(gameState?.speedMultiplier || 1);
+}
+
+const SPEED_LABELS = { 1: '▶ SPEED: 1×', 2: '⚡ SPEED: 2×', 3: '🔥 SPEED: 3×' };
+const SPEED_COLORS = { 1: '#00ff88',      2: '#ffaa00',      3: '#ff4444' };
+
+function updateSpeedButton(speed) {
+  const btn = document.getElementById('btn-speed');
+  if (!btn) return;
+  btn.textContent = SPEED_LABELS[speed] || SPEED_LABELS[1];
+  btn.style.borderColor = SPEED_COLORS[speed] || SPEED_COLORS[1];
+  btn.style.color       = SPEED_COLORS[speed] || SPEED_COLORS[1];
+  btn.style.background  = speed === 1 ? '#1a2a1a' : speed === 2 ? '#2a1a00' : '#2a0a0a';
+}
+
+function updateSpeedIndicator(speed) {
+  const el = document.getElementById('speed-indicator');
+  if (!el) return;
+  if (speed <= 1) { el.style.display = 'none'; return; }
+  el.style.display = 'inline';
+  el.textContent   = speed === 2 ? '⚡ 2×' : '🔥 3×';
+  el.style.color   = SPEED_COLORS[speed];
 }
 
 function renderWavePreview(incomingEnemies, theme) {
   const panel = document.getElementById('wave-preview');
   const list = document.getElementById('wave-preview-list');
+  const header = document.getElementById('wave-preview-header');
   list.innerHTML = '';
 
-  // Render as compact horizontal badges: emoji + name + ×count
+  if (header) header.textContent = theme ? `⚠ INCOMING — ${theme.toUpperCase()}` : '⚠ INCOMING ENEMIES';
+
   for (const e of incomingEnemies) {
     const emoji = ENEMY_EMOJIS[e.type] || '❓';
     const color = '#' + (ENEMY_COLORS[e.type] || 0xff4444).toString(16).padStart(6, '0');
-    const badge = document.createElement('div');
-    badge.title = ENEMY_DEFS[e.type]?.description || '';
-    badge.style.cssText = `
-      display:inline-flex;align-items:center;gap:3px;
-      padding:3px 6px;
-      background:#111;
-      border:1px solid ${color}55;
-      font-size:0.7rem;font-family:'Courier New',monospace;
-      white-space:nowrap;
+    const row = document.createElement('div');
+    row.title = ENEMY_DEFS[e.type]?.description || '';
+    row.style.cssText = `
+      display:flex;align-items:center;gap:6px;
+      padding:4px 8px;
+      background:#0d0d18;
+      border-left:3px solid ${color};
+      font-size:0.72rem;font-family:'Courier New',monospace;
     `;
-    badge.innerHTML = `
-      <span style="font-size:13px;line-height:1">${emoji}</span>
-      <span style="color:${color}">${e.name}</span>
-      <span style="color:#555">×${e.count}${e.isBoss ? ' <span style="color:#ff4444;font-weight:bold">BOSS</span>' : ''}</span>
+    row.innerHTML = `
+      <span style="font-size:15px;line-height:1;flex-shrink:0">${emoji}</span>
+      <span style="color:${color};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.name}</span>
+      <span style="color:#666;flex-shrink:0">×${e.count}</span>
+      ${e.isBoss ? `<span style="color:#ff4444;font-size:0.6rem;font-weight:bold;padding:1px 4px;border:1px solid #ff4444;flex-shrink:0">BOSS</span>` : ''}
     `;
-    list.appendChild(badge);
+    list.appendChild(row);
   }
 
   panel.style.display = 'block';
@@ -416,6 +512,11 @@ document.getElementById('btn-start').addEventListener('click', () => socket.emit
 document.getElementById('btn-skip-planning').addEventListener('click', () => socket.emit('skip_planning'));
 document.getElementById('btn-next-wave').addEventListener('click', () => { hideOverlay(); socket.emit('next_wave'); });
 document.getElementById('btn-reset').addEventListener('click', () => socket.emit('reset_game'));
+document.getElementById('btn-speed').addEventListener('click', () => {
+  const current = gameState?.speedMultiplier || 1;
+  const next = current === 1 ? 2 : current === 2 ? 3 : 1;
+  socket.emit('set_speed', { multiplier: next });
+});
 
 // ── Phaser Game ────────────────────────────────
 function initPhaser() {
@@ -450,6 +551,11 @@ function create() {
     setSelectedTower: (id) => { selectedTower = id; },
     resetScene,
     stopAll,
+    spawnDeathParticles: (enemyId, enemyType, isBoss) => {
+      const obj = enemiesOnCanvas[enemyId];
+      if (!obj) return;
+      spawnDeathParticles(obj.g.x, obj.g.y, ENEMY_COLORS[enemyType] || 0xff4444, isBoss);
+    },
   };
 
   graphics = scene.add.graphics();
@@ -927,9 +1033,9 @@ function updateCanvasTooltip(px, py, nativeEvent) {
       tt.innerHTML = `
         <strong style="color:${domColor}">${def.emoji} ${def.name}</strong>
         <div style="margin:4px 0">${def.description}</div>
-        <div style="color:#555;font-size:0.68rem">${def.guardrails}</div>
-        <div style="color:#888;font-size:0.68rem;margin-top:3px">Domain: ${def.domain} · Cost: ${def.cost}¢</div>
-        <div style="color:#666;font-size:0.68rem">Owner: ${escHtml(tower.ownerName)}</div>
+        <div style="color:#7ab8d4;font-size:0.68rem">${def.guardrails}</div>
+        <div style="color:#aaa;font-size:0.68rem;margin-top:3px">Domain: ${def.domain} · Cost: ${def.cost}¢</div>
+        <div style="color:#ccc;font-size:0.68rem">Owner: ${escHtml(tower.ownerName)}</div>
       `;
       positionTooltip(tt, nativeEvent);
       tt.style.display = 'block';
@@ -975,39 +1081,81 @@ function hideCanvasTooltip() {
 }
 
 function showShot({ towerId, enemyId, damage, multiplier, tx, ty, ex, ey }) {
-  const color = multiplier >= 2 ? 0xffff00 : 0x00ff88;
+  const isCrit = multiplier >= 2;
+  const color = isCrit ? 0xffff00 : 0x00ccff;
 
-  const line = scene.add.graphics();
-  line.lineStyle(multiplier >= 2 ? 3 : 1, color, 0.9);
-  line.lineBetween(tx, ty, ex, ey);
+  // Tower domain sound
+  const tower = gameState?.towers?.find(t => t.id === towerId);
+  const domain = tower ? TOWERS_DEF[tower.type]?.domain : 'Network';
+  soundShot(domain);
 
-  // Flash on enemy
-  const obj = enemiesOnCanvas[enemyId];
-  if (obj) {
-    scene.tweens.add({
-      targets: obj.g,
-      alpha: 0.2,
-      duration: 80,
-      yoyo: true,
-      repeat: 1,
-    });
+  // Animated bullet
+  const bullet = scene.add.graphics();
+  bullet.fillStyle(color, 1);
+  bullet.fillCircle(0, 0, isCrit ? 4 : 3);
+  if (isCrit) {
+    bullet.lineStyle(1.5, 0xffffff, 0.5);
+    bullet.strokeCircle(0, 0, 6);
   }
+  bullet.setPosition(tx, ty);
 
-  // Damage number
-  const dmgText = scene.add.text(ex, ey - 10, `-${damage}`, {
-    font: `bold ${multiplier >= 2 ? 14 : 11}px Courier New`,
-    color: multiplier >= 2 ? '#ffff00' : '#ffffff',
-  }).setOrigin(0.5);
+  const dx = ex - tx, dy = ey - ty;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const travelMs = Math.max(55, dist / 800 * 1000);
 
   scene.tweens.add({
-    targets: dmgText,
-    y: ey - 35,
-    alpha: 0,
-    duration: 700,
-    onComplete: () => dmgText.destroy(),
-  });
+    targets: bullet,
+    x: ex, y: ey,
+    duration: travelMs,
+    ease: 'Linear',
+    onComplete: () => {
+      bullet.destroy();
 
-  scene.time.delayedCall(150, () => line.destroy());
+      // Hit flash on arrival
+      const obj = enemiesOnCanvas[enemyId];
+      if (obj) {
+        scene.tweens.add({ targets: obj.g, alpha: 0.15, duration: 60, yoyo: true, repeat: 1 });
+      }
+
+      // Damage number on arrival
+      const dmgText = scene.add.text(ex, ey - 10, `-${damage}`, {
+        font: `bold ${isCrit ? 14 : 11}px Courier New`,
+        color: isCrit ? '#ffff00' : '#ffffff',
+      }).setOrigin(0.5);
+      scene.tweens.add({
+        targets: dmgText,
+        y: ey - 38,
+        alpha: 0,
+        duration: 700,
+        onComplete: () => dmgText.destroy(),
+      });
+    },
+  });
+}
+
+// ── Death particles ────────────────────────────
+function spawnDeathParticles(x, y, color, isBoss) {
+  const count = isBoss ? 18 : 8;
+  const speed = isBoss ? 110 : 70;
+  const dur   = isBoss ? 550 : 360;
+  for (let i = 0; i < count; i++) {
+    const p = scene.add.graphics();
+    const sz = isBoss ? 2 + Math.random() * 3 : 1.5 + Math.random() * 2;
+    p.fillStyle(color, 1);
+    p.fillCircle(0, 0, sz);
+    p.setPosition(x, y);
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+    const spd   = speed * (0.4 + Math.random() * 0.6);
+    scene.tweens.add({
+      targets: p,
+      x: x + Math.cos(angle) * spd,
+      y: y + Math.sin(angle) * spd,
+      alpha: 0,
+      duration: dur,
+      ease: 'Quad.easeOut',
+      onComplete: () => p.destroy(),
+    });
+  }
 }
 
 // ── Lives flash ────────────────────────────────
@@ -1016,6 +1164,7 @@ function flashLives() {
   el.style.color = '#ff0000';
   el.style.textShadow = '0 0 10px #ff0000';
   setTimeout(() => { el.style.color = '#ff4444'; el.style.textShadow = ''; }, 600);
+  if (scene) scene.cameras.main.shake(280, 0.009);
 }
 
 // ── Scene control ──────────────────────────────

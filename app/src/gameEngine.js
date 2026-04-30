@@ -32,6 +32,7 @@ function createGameState() {
     waveSpawnQueue: [],
     score: 0,
     hostId: null,
+    speedMultiplier: 1,
   };
 }
 
@@ -97,6 +98,7 @@ class GameEngine {
     if (!wave) { this.endGame(true); return; }
 
     this.state.phase = 'wave';
+    this.state.speedMultiplier = 1;
     this.state.waveSpawnQueue = this._buildSpawnQueue(wave);
     this.broadcast('phase_change', { phase: 'wave', waveNumber: wave.number, theme: wave.theme });
 
@@ -173,7 +175,7 @@ class GameEngine {
       const dx = tx - enemy.x;
       const dy = ty - enemy.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const step = enemy.speed * dt;
+      const step = enemy.speed * dt * (this.state.speedMultiplier || 1);
       if (dist <= step) {
         enemy.x = tx;
         enemy.y = ty;
@@ -409,6 +411,15 @@ class GameEngine {
     return { ok: true };
   }
 
+  setSpeedByHost(socketId, multiplier) {
+    if (socketId !== this.state.hostId) return { ok: false, error: 'Only host can change speed' };
+    if (this.state.phase !== 'wave') return { ok: false, error: 'Can only change speed during a wave' };
+    const valid = [1, 2, 3];
+    this.state.speedMultiplier = valid.includes(multiplier) ? multiplier : 1;
+    this.broadcast('speed_changed', { speedMultiplier: this.state.speedMultiplier });
+    return { ok: true };
+  }
+
   resetGame(socketId) {
     if (socketId !== this.state.hostId) return { ok: false, error: 'Only host can reset' };
     if (this.tickInterval) clearInterval(this.tickInterval);
@@ -449,6 +460,7 @@ class GameEngine {
       towers: Object.values(this.state.towers),
       hostId: this.state.hostId,
       planningEndsAt: this.state.planningEndsAt,
+      speedMultiplier: this.state.speedMultiplier || 1,
     };
   }
 
