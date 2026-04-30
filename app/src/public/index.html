@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guardrail TD — Cloud Defense</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #lobby {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 18px;
+    }
+    #lobby h1 {
+      font-size: 2.4rem;
+      color: #00ff88;
+      text-shadow: 0 0 20px #00ff8888;
+      letter-spacing: 4px;
+    }
+    #lobby h2 { color: #7ab8d4; font-size: 1rem; letter-spacing: 2px; }
+    #lobby input {
+      background: #111;
+      border: 2px solid #00ff88;
+      color: #00ff88;
+      font-family: 'Courier New', monospace;
+      font-size: 1.2rem;
+      padding: 10px 20px;
+      text-align: center;
+      outline: none;
+      width: 280px;
+    }
+    #lobby button, .btn {
+      background: #00ff88;
+      color: #0a0a0f;
+      border: none;
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 10px 28px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: background 0.15s;
+    }
+    #lobby button:hover, .btn:hover { background: #00cc66; }
+    #lobby .waiting { color: #7a9ab8; font-size: 0.85rem; }
+    #lobby .players-list { color: #00aaff; font-size: 0.9rem; max-width: 300px; text-align: center; }
+
+    #game-ui {
+      display: none;
+      flex-direction: row;
+      height: 100vh;
+      width: 100vw;
+    }
+
+     /* LEFT: kill feed */
+     #kill-feed {
+       width: 220px;
+       min-width: 220px;
+       background: #07070f;
+       border-right: 2px solid #1a1a2e;
+       display: flex;
+       flex-direction: column;
+       justify-content: flex-end;
+       overflow: hidden;
+       padding: 8px 0 8px 0;
+       position: relative;
+     }
+     #kill-feed-header {
+       position: absolute;
+       top: 0; left: 0; right: 0;
+       padding: 8px 10px 6px;
+       font-size: 0.7rem;
+       color: #4a7a9a;
+       letter-spacing: 2px;
+       border-bottom: 1px solid #111;
+       background: #07070f;
+       z-index: 1;
+     }
+     #kill-feed-entries {
+       display: flex;
+       flex-direction: column;
+       justify-content: flex-end;
+       gap: 4px;
+       padding: 32px 6px 4px;
+       overflow: hidden;
+       flex: 1;
+     }
+     .kf-entry {
+       background: #0d0d18;
+       border: 1px solid #1a1a2e;
+       border-left: 3px solid #00ff88;
+       padding: 5px 7px;
+       font-size: 0.72rem;
+       color: #c8dce8;
+       line-height: 1.4;
+       animation: kf-slide-in 0.25s ease-out, kf-fade-out 1s ease-in 5s forwards;
+       flex-shrink: 0;
+     }
+     .kf-entry.boss { border-left-color: #ff4444; }
+     .kf-entry .kf-tower { color: #00ff88; font-weight: bold; }
+     .kf-entry .kf-enemy { color: #ffaa00; font-weight: bold; }
+     .kf-entry .kf-reward { color: #ffcc00; font-size: 0.68rem; }
+     .kf-entry .kf-desc { color: #5a9aaa; font-size: 0.66rem; margin-top: 2px; display: block; }
+     @keyframes kf-slide-in {
+       from { opacity: 0; transform: translateY(12px); }
+       to   { opacity: 1; transform: translateY(0); }
+     }
+     @keyframes kf-fade-out {
+       from { opacity: 1; }
+       to   { opacity: 0; }
+     }
+
+     /* LEFT: game canvas */
+    #canvas-wrap {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+    #game-canvas { display: block; }
+
+     /* RIGHT: sidebar */
+     #sidebar {
+       width: 320px;
+       background: #0d0d18;
+       border-left: 2px solid #1a1a2e;
+       display: flex;
+       flex-direction: column;
+       overflow: hidden;
+     }
+     #sidebar-header {
+       background: #0a0a14;
+       padding: 12px 16px;
+       border-bottom: 1px solid #1a1a2e;
+        font-size: 0.82rem;
+        color: #7ab8d4;
+        letter-spacing: 2px;
+      }
+     #status-bar {
+       display: flex;
+       justify-content: space-between;
+       padding: 12px 16px;
+       background: #111;
+       border-bottom: 1px solid #1a1a2e;
+       font-size: 0.95rem;
+     }
+     .stat { text-align: center; }
+     .stat-val { font-size: 1.4rem; font-weight: bold; color: #00ff88; }
+     .stat-lbl { font-size: 0.75rem; color: #7ab8d4; letter-spacing: 1px; }
+     #lives-val { color: #ff4444; }
+     #wave-val { color: #ffaa00; }
+
+     /* Tower shop */
+     #tower-shop {
+       padding: 10px;
+       border-bottom: 1px solid #1a1a2e;
+       overflow-y: auto;
+       max-height: 380px;
+     }
+     #tower-shop h3 { font-size: 0.82rem; color: #7ab8d4; letter-spacing: 2px; margin-bottom: 8px; padding-left: 4px; }
+     .tower-btn {
+       display: flex;
+       align-items: center;
+       gap: 10px;
+       width: 100%;
+       background: #111;
+       border: 1px solid #1a1a2e;
+       color: #c8dce8;
+       font-family: 'Courier New', monospace;
+       font-size: 0.9rem;
+       padding: 8px 10px;
+       cursor: pointer;
+       margin-bottom: 5px;
+       transition: border-color 0.15s, background 0.15s;
+       text-align: left;
+     }
+     .tower-btn:hover { border-color: #00ff88; background: #151520; }
+     .tower-btn.selected { border-color: #00ff88; background: #0a1a12; color: #00ff88; }
+     .tower-btn.cant-afford { opacity: 0.4; cursor: not-allowed; }
+     .tower-icon {
+       width: 34px; height: 34px;
+       display: flex; align-items: center; justify-content: center;
+       font-size: 0.78rem; font-weight: bold;
+       flex-shrink: 0;
+       border-radius: 2px;
+     }
+     .tower-info { flex: 1; }
+     .tower-name { font-weight: bold; font-size: 0.9rem; }
+     .tower-meta { color: #6ec8a8; font-size: 0.78rem; margin-top: 2px; }
+     .tower-cost { color: #ffcc00; font-size: 0.9rem; font-weight: bold; }
+
+     /* Leaderboard */
+     #leaderboard {
+       flex: 1;
+       padding: 10px;
+       overflow-y: auto;
+     }
+     #leaderboard h3 { font-size: 0.82rem; color: #7ab8d4; letter-spacing: 2px; margin-bottom: 8px; padding-left: 4px; }
+     .player-row {
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       padding: 6px 8px;
+       margin-bottom: 4px;
+       background: #111;
+       border: 1px solid #1a1a2e;
+       font-size: 0.88rem;
+     }
+     .player-row.me { border-color: #00ff88; }
+     .player-name { color: #e8eef4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+     .player-stats { color: #6ec8a8; font-size: 0.78rem; text-align: right; }
+     .player-currency { color: #ffcc00; font-size: 0.92rem; font-weight: bold; }
+
+     /* Host controls */
+     #host-controls {
+       padding: 10px;
+       border-top: 1px solid #1a1a2e;
+       display: flex;
+       flex-direction: column;
+       gap: 5px;
+     }
+     .host-btn {
+       background: #1a2a1a;
+       border: 1px solid #00ff88;
+       color: #00ff88;
+       font-family: 'Courier New', monospace;
+       font-size: 0.88rem;
+       padding: 8px;
+       cursor: pointer;
+       letter-spacing: 1px;
+       transition: background 0.15s;
+     }
+     .host-btn:hover { background: #0a3a1a; }
+     .host-btn.danger { border-color: #ff4444; color: #ff4444; background: #1a0a0a; }
+     .host-btn.danger:hover { background: #2a0a0a; }
+
+    /* Overlay panels */
+    #overlay {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #overlay.show { display: flex; }
+    #overlay-box {
+      background: #0d0d18;
+      border: 2px solid #00ff88;
+      padding: 32px 40px;
+      max-width: 540px;
+      width: 90%;
+      text-align: center;
+    }
+    #overlay-box h2 { color: #00ff88; font-size: 1.4rem; letter-spacing: 3px; margin-bottom: 12px; }
+    #overlay-box p { color: #b8d4e8; font-size: 0.9rem; line-height: 1.6; margin-bottom: 16px; }
+    #overlay-leaderboard { text-align: left; margin: 12px 0; font-size: 0.85rem; }
+    #overlay-leaderboard .lb-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a2e; }
+    #overlay-leaderboard .lb-rank { color: #ffcc00; width: 24px; }
+    #overlay-leaderboard .lb-name { color: #e8eef4; flex: 1; }
+    #overlay-leaderboard .lb-kills { color: #00ff88; width: 60px; text-align: right; }
+
+    /* Popup notification */
+     #popup {
+       position: fixed;
+       bottom: 20px;
+       left: 50%;
+       transform: translateX(-50%);
+       background: #1a0a0a;
+       border: 1px solid #ff4444;
+       padding: 10px 18px;
+       font-size: 0.82rem;
+       color: #ff8888;
+       max-width: 400px;
+       text-align: center;
+       z-index: 200;
+       opacity: 0;
+       transition: opacity 0.3s;
+       pointer-events: none;
+     }
+     #popup.show { opacity: 1; }
+
+    /* Timer bar */
+    #timer-bar-wrap {
+      height: 4px;
+      background: #111;
+      border-bottom: 1px solid #1a1a2e;
+    }
+    #timer-bar {
+      height: 100%;
+      background: #00ff88;
+      transition: width 0.5s linear;
+      width: 0%;
+    }
+
+    /* Phase indicator */
+     #phase-indicator {
+       padding: 6px 14px;
+       font-size: 0.7rem;
+       letter-spacing: 2px;
+       background: #111;
+       border-bottom: 1px solid #1a1a2e;
+       color: #7ab8d4;
+     }
+     #phase-indicator span { color: #ffaa00; }
+
+     /* Tooltip */
+     #tower-tooltip {
+      display: none;
+      position: fixed;
+      background: #0d0d18;
+      border: 1px solid #00ff88;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+       color: #c8dce8;
+      pointer-events: none;
+      z-index: 300;
+      line-height: 1.5;
+    }
+    #tower-tooltip strong { color: #00ff88; display: block; margin-bottom: 4px; }
+    #tower-tooltip .tt-ids { color: #7ab8d4; font-size: 0.68rem; margin-top: 4px; }
+
+    /* Enemy DOM label overlay */
+    #decor-layer {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .decor-cell {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0.55;
+    }
+    #enemy-labels {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .enemy-label {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      line-height: 1;
+    }
+    .enemy-label .e-emoji {
+      font-size: 44px;
+      line-height: 1;
+      display: block;
+    }
+    .enemy-label.boss .e-emoji { font-size: 56px; }
+    .enemy-label .e-name {
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+      font-weight: bold;
+      padding: 1px 3px;
+      margin-top: 2px;
+      background: rgba(0,0,0,0.82);
+      border: 1px solid currentColor;
+      white-space: nowrap;
+      letter-spacing: 0.5px;
+    }
+    .enemy-label.boss .e-name { font-size: 8px; margin-top: 26px; }
+    #sell-hint {
+      display: none;
+      position: fixed;
+      background: #1a0a0a;
+      border: 1px solid #ff4444;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      color: #ff8888;
+      pointer-events: none;
+      z-index: 300;
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <h1>GUARDRAIL TD</h1>
+  <h2>CLOUD DEFENSE FORCE</h2>
+  <input id="name-input" type="text" placeholder="ENTER YOUR NAME" maxlength="18" autocomplete="off" />
+  <button id="join-btn">JOIN GAME</button>
+  <div class="waiting" id="lobby-status">Waiting for players...</div>
+  <div class="players-list" id="lobby-players"></div>
+</div>
+
+<!-- GAME UI -->
+<div id="game-ui">
+  <div id="kill-feed">
+    <div id="kill-feed-header">KILL FEED</div>
+    <div id="kill-feed-entries"></div>
+  </div>
+   <div id="canvas-wrap">
+     <canvas id="game-canvas"></canvas>
+     <div id="decor-layer"></div>
+     <div id="enemy-labels"></div>
+   </div>
+
+  <div id="sidebar">
+    <div id="sidebar-header">GUARDRAIL TD // CLOUD DEFENSE</div>
+
+    <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+
+    <div id="phase-indicator">PHASE: <span id="phase-text">LOBBY</span></div>
+
+    <!-- Wave preview — shown during planning, right under the phase bar -->
+    <div id="wave-preview" style="display:none;padding:6px 8px;border-bottom:1px solid #1a1a2e;background:#0a0f0a;">
+      <div style="font-size:0.65rem;color:#ffaa00;letter-spacing:2px;margin-bottom:4px;">⚠ INCOMING ENEMIES</div>
+      <div id="wave-preview-list" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+    </div>
+
+    <div id="status-bar">
+      <div class="stat">
+        <div class="stat-val" id="lives-val">20</div>
+        <div class="stat-lbl">LIVES</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="wave-val">0/5</div>
+        <div class="stat-lbl">WAVE</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="score-val">0</div>
+        <div class="stat-lbl">SCORE</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="my-currency-val" style="color:#ffcc00">100</div>
+        <div class="stat-lbl">MY ¢</div>
+      </div>
+    </div>
+
+    <div id="tower-shop">
+      <h3>PLACE TOWERS</h3>
+      <div id="tower-list"></div>
+    </div>
+
+    <div id="leaderboard">
+      <h3>PLAYERS</h3>
+      <div id="player-list"></div>
+    </div>
+
+    <div id="host-controls">
+      <div id="host-only" style="display:none">
+        <button class="host-btn" id="btn-start" style="display:none">▶ START GAME</button>
+        <button class="host-btn" id="btn-skip-planning" style="display:none">⚡ LAUNCH WAVE</button>
+        <button class="host-btn" id="btn-next-wave" style="display:none">▶ NEXT WAVE</button>
+        <button class="host-btn danger" id="btn-reset" style="display:none">↺ RESET GAME</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERLAY (wave over / game over) -->
+<div id="overlay">
+  <div id="overlay-box">
+    <h2 id="overlay-title"></h2>
+    <p id="overlay-body"></p>
+    <div id="overlay-leaderboard"></div>
+    <button class="btn" id="overlay-btn" style="display:none">CONTINUE</button>
+  </div>
+</div>
+
+<!-- KILL POPUP -->
+<div id="popup"></div>
+
+<!-- TOWER TOOLTIP -->
+<div id="tower-tooltip"></div>
+
+<!-- SELL HINT -->
+<div id="sell-hint"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<script src="/js/game.js"></script>
+</body>
+</html>

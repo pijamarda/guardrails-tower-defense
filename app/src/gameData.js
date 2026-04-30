@@ -1,0 +1,291 @@
+// ─────────────────────────────────────────────
+//  GUARDRAIL TD  —  Game Data
+//  Towers, Enemies, Waves, Effectiveness Matrix
+// ─────────────────────────────────────────────
+
+const TOWERS = {
+  https_enforcer: {
+    id: 'https_enforcer',
+    name: 'HTTPS Enforcer',
+    domain: 'Network',
+    cost: 50,
+    damage: 25,
+    range: 2,
+    fireRate: 1000, // ms between shots
+    color: 0x00aaff,
+    symbol: 'HE',
+    description: 'Enforces TLS 1.2+ and blocks plain HTTP traffic',
+    guardrails: ['G.01.01', 'G.01.08'],
+  },
+  perimeter_wall: {
+    id: 'perimeter_wall',
+    name: 'Perimeter Wall',
+    domain: 'Network',
+    cost: 75,
+    damage: 30,
+    range: 2,
+    fireRate: 1200,
+    color: 0x0066cc,
+    symbol: 'PW',
+    description: 'Blocks public access, prevents default VPCs and rogue NATs',
+    guardrails: ['G.01.04', 'G.01.06', 'G.01.07'],
+  },
+  encryption_vault: {
+    id: 'encryption_vault',
+    name: 'Encryption Vault',
+    domain: 'Data Protection',
+    cost: 60,
+    damage: 20,
+    range: 2,
+    fireRate: 900,
+    color: 0xffaa00,
+    symbol: 'EV',
+    description: 'Encrypts everything at rest and in transit',
+    guardrails: ['G.02.01', 'G.02.02'],
+  },
+  key_warden: {
+    id: 'key_warden',
+    name: 'Key Warden',
+    domain: 'Data Protection',
+    cost: 80,
+    damage: 22,
+    range: 2,
+    fireRate: 1100,
+    color: 0xff6600,
+    symbol: 'KW',
+    description: 'Prevents cross-tenant replication, expires stale keys',
+    guardrails: ['G.02.04', 'G.02.06'],
+  },
+  iam_sentinel: {
+    id: 'iam_sentinel',
+    name: 'IAM Sentinel',
+    domain: 'IAM',
+    cost: 100,
+    damage: 40,
+    range: 2,
+    fireRate: 1500,
+    color: 0xcc00cc,
+    symbol: 'IS',
+    description: 'Prevents IAM user creation, denies root access, protects central roles',
+    guardrails: ['G.03.01', 'G.03.07', 'G.03.08'],
+  },
+  identity_gate: {
+    id: 'identity_gate',
+    name: 'Identity Gate',
+    domain: 'IAM',
+    cost: 70,
+    damage: 28,
+    range: 2,
+    fireRate: 1000,
+    color: 0x9900cc,
+    symbol: 'IG',
+    description: 'Enforces IMDSv2, blocks anonymous access, requires Entra ID',
+    guardrails: ['G.03.03', 'G.03.05', 'G.03.06'],
+  },
+  watchtower: {
+    id: 'watchtower',
+    name: 'Watchtower',
+    domain: 'GRC',
+    cost: 90,
+    damage: 35,
+    range: 3,
+    fireRate: 1300,
+    color: 0x00cc66,
+    symbol: 'WT',
+    description: 'Streams logs, protects CloudTrail and GuardDuty, streams Defender data',
+    guardrails: ['G.04.01', 'G.04.02', 'G.04.03', 'G.04.04'],
+  },
+  tag_region_lock: {
+    id: 'tag_region_lock',
+    name: 'Tag & Region Lock',
+    domain: 'GRC',
+    cost: 55,
+    damage: 18,
+    range: 2,
+    fireRate: 800,
+    color: 0x009966,
+    symbol: 'TR',
+    description: 'Enforces reserved tags, restricts regions, limits allowed SKUs',
+    guardrails: ['G.04.05', 'G.04.08', 'G.04.10'],
+  },
+};
+
+const ENEMIES = {
+  unencrypted_bucket: {
+    id: 'unencrypted_bucket',
+    name: 'Unencrypted Bucket',
+    hp: 60,
+    speed: 60,
+    livesDamage: 1,
+    reward: 10,
+    color: 0xff4444,
+    symbol: '🪣',
+    description: 'S3/Blob storage with no encryption at rest — data exposed in plaintext',
+    weakTo: ['https_enforcer', 'encryption_vault'],
+  },
+  naked_vm: {
+    id: 'naked_vm',
+    name: 'Naked VM',
+    hp: 120,
+    speed: 50,
+    livesDamage: 2,
+    reward: 15,
+    color: 0xff6600,
+    symbol: '🖥️',
+    description: 'EC2/VM with a public IP and zero perimeter controls',
+    weakTo: ['perimeter_wall', 'https_enforcer'],
+  },
+  stale_key: {
+    id: 'stale_key',
+    name: 'Stale Key',
+    hp: 50,
+    speed: 90,
+    livesDamage: 1,
+    reward: 8,
+    color: 0xffcc00,
+    symbol: '🗝️',
+    description: 'Key Vault key with no expiry — been rotating since 2019',
+    weakTo: ['key_warden', 'encryption_vault'],
+  },
+  rogue_iam_user: {
+    id: 'rogue_iam_user',
+    name: 'Rogue IAM User',
+    hp: 100,
+    speed: 55,
+    livesDamage: 2,
+    reward: 15,
+    color: 0xcc44cc,
+    symbol: '👤',
+    description: 'IAM user created outside approved process — no MFA, wide permissions',
+    weakTo: ['iam_sentinel', 'identity_gate'],
+  },
+  anon_container: {
+    id: 'anon_container',
+    name: 'Anon Container',
+    hp: 40,
+    speed: 110,
+    livesDamage: 1,
+    reward: 8,
+    color: 0xaa44ff,
+    symbol: '📦',
+    description: 'Azure container registry with anonymous public read enabled',
+    weakTo: ['identity_gate', 'iam_sentinel'],
+  },
+  unlogged_resource: {
+    id: 'unlogged_resource',
+    name: 'Unlogged Resource',
+    hp: 80,
+    speed: 80,
+    livesDamage: 2,
+    reward: 12,
+    color: 0x666666,
+    symbol: '👻',
+    description: 'Resource with no CloudTrail trail or log stream — invisible to defenders',
+    weakTo: ['watchtower', 'tag_region_lock'],
+  },
+  shadow_admin: {
+    id: 'shadow_admin',
+    name: 'Shadow Admin',
+    hp: 600,
+    speed: 25,
+    livesDamage: 5,
+    reward: 80,
+    color: 0x880000,
+    symbol: '💀',
+    isBoss: true,
+    description: 'BOSS: Escalated privileges operating entirely outside SCP boundaries',
+    weakTo: ['iam_sentinel', 'watchtower', 'identity_gate'],
+  },
+  region_jumper: {
+    id: 'region_jumper',
+    name: 'Region Jumper',
+    hp: 400,
+    speed: 70,
+    livesDamage: 4,
+    reward: 60,
+    color: 0x004488,
+    symbol: '🌍',
+    isBoss: true,
+    description: 'BOSS: Workload deployed in a forbidden region, evading all controls',
+    weakTo: ['tag_region_lock', 'perimeter_wall', 'watchtower'],
+  },
+};
+
+// Effectiveness multipliers: [attacker_tower][target_enemy] = multiplier
+// Default damage is 1.0x. Weak-to gives 2.0x. Resistant gives 0.4x.
+function getDamageMultiplier(towerId, enemyId) {
+  const enemy = ENEMIES[enemyId];
+  if (!enemy) return 1.0;
+  if (enemy.weakTo && enemy.weakTo.includes(towerId)) return 2.0;
+  return 1.0;
+}
+
+// Wave definitions
+const WAVES = [
+  {
+    number: 1,
+    theme: 'Network Basics',
+    teachingMoment: 'HTTPS Enforcer and Perimeter Wall guardrails block unencrypted traffic and stop resources from being exposed to the public internet.',
+    enemies: [
+      { type: 'unencrypted_bucket', count: 6, interval: 1800 },
+      { type: 'naked_vm', count: 3, interval: 2500 },
+    ],
+  },
+  {
+    number: 2,
+    theme: 'Data at Risk',
+    teachingMoment: 'Encryption Vault and Key Warden ensure data is always encrypted and keys are rotated — stale keys are as dangerous as no keys.',
+    enemies: [
+      { type: 'stale_key', count: 8, interval: 1200 },
+      { type: 'unencrypted_bucket', count: 4, interval: 1800 },
+    ],
+  },
+  {
+    number: 3,
+    theme: 'Identity Crisis',
+    teachingMoment: 'IAM Sentinel and Identity Gate prevent rogue users and anonymous access — every identity must be known, authenticated, and scoped.',
+    enemies: [
+      { type: 'rogue_iam_user', count: 5, interval: 2000 },
+      { type: 'anon_container', count: 6, interval: 1500 },
+      { type: 'naked_vm', count: 3, interval: 2500 },
+    ],
+  },
+  {
+    number: 4,
+    theme: 'Dark Activity',
+    teachingMoment: 'Watchtower guardrails ensure nothing goes unlogged — unmonitored resources are attackers\' best friends.',
+    enemies: [
+      { type: 'unlogged_resource', count: 7, interval: 1600 },
+      { type: 'rogue_iam_user', count: 4, interval: 2000 },
+    ],
+  },
+  {
+    number: 5,
+    theme: 'BOSS WAVE — All Domains',
+    teachingMoment: 'No single guardrail wins alone. Layered defense across Network, Data, IAM and GRC is what stops a Shadow Admin.',
+    enemies: [
+      { type: 'unencrypted_bucket', count: 4, interval: 1200 },
+      { type: 'naked_vm', count: 3, interval: 1800 },
+      { type: 'rogue_iam_user', count: 4, interval: 1800 },
+      { type: 'unlogged_resource', count: 4, interval: 1600 },
+      { type: 'region_jumper', count: 1, interval: 5000 },
+      { type: 'shadow_admin', count: 1, interval: 8000 },
+    ],
+  },
+];
+
+// The path as grid coordinates [col, row] — enemies walk this sequence
+// Grid is 20 cols x 14 rows
+const PATH = [
+  [0,2],[1,2],[2,2],[3,2],[4,2],
+  [4,3],[4,4],[4,5],[4,6],
+  [5,6],[6,6],[7,6],[8,6],[9,6],
+  [9,5],[9,4],[9,3],[9,2],
+  [10,2],[11,2],[12,2],[13,2],
+  [13,3],[13,4],[13,5],[13,6],[13,7],[13,8],
+  [12,8],[11,8],[10,8],[9,8],[8,8],[7,8],
+  [7,9],[7,10],[7,11],
+  [8,11],[9,11],[10,11],[11,11],[12,11],[13,11],[14,11],[15,11],[16,11],[17,11],[18,11],[19,11],
+];
+
+module.exports = { TOWERS, ENEMIES, WAVES, PATH, getDamageMultiplier };

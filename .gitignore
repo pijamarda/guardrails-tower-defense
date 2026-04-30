@@ -1,0 +1,38 @@
+# ── Node ──────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── Terraform ─────────────────────────────────────────
+# State files contain real resource IDs and secrets (e.g. ACR passwords).
+# Use a remote backend (GCS / Azure Blob) for shared state instead.
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfstate.*.backup
+
+# terraform.tfvars contains real project IDs / subscription IDs / secrets.
+# Each developer copies terraform.tfvars.example and fills in their own values.
+**/terraform.tfvars
+
+# Crash and override files
+**/crash.log
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# ── Environment / secrets ─────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Editor ────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
