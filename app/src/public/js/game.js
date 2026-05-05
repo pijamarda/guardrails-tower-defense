@@ -23,14 +23,14 @@ const PATH = [
 const PATH_SET = new Set(PATH.map(([c,r]) => `${c},${r}`));
 
 const TOWERS_DEF = {
-  https_enforcer:  { name:'HTTPS Enforcer',   domain:'Network',         cost:50,  color:0x00aaff, emoji:'🔒', description:'Enforces TLS 1.2+ and blocks plain HTTP traffic',                             guardrails:'G.01.01, G.01.08' },
-  perimeter_wall:  { name:'Perimeter Wall',   domain:'Network',         cost:75,  color:0x0066cc, emoji:'🧱', description:'Blocks public access, prevents default VPCs and rogue NATs',                 guardrails:'G.01.04, G.01.06, G.01.07' },
-  encryption_vault:{ name:'Encryption Vault', domain:'Data Protection', cost:60,  color:0xffaa00, emoji:'🔐', description:'Encrypts everything at rest and in transit',                                  guardrails:'G.02.01, G.02.02' },
-  key_warden:      { name:'Key Warden',       domain:'Data Protection', cost:80,  color:0xff6600, emoji:'🗝️', description:'Prevents cross-tenant replication, expires stale keys',                      guardrails:'G.02.04, G.02.06' },
-  iam_sentinel:    { name:'IAM Sentinel',     domain:'IAM',             cost:100, color:0xcc00cc, emoji:'🛡️', description:'Prevents IAM user creation, denies root access, protects central roles',     guardrails:'G.03.01, G.03.07, G.03.08' },
-  identity_gate:   { name:'Identity Gate',    domain:'IAM',             cost:70,  color:0x9900cc, emoji:'🚪', description:'Enforces IMDSv2, blocks anonymous access, requires Entra ID auth',           guardrails:'G.03.03, G.03.05, G.03.06' },
-  watchtower:      { name:'Watchtower',       domain:'GRC',             cost:90,  color:0x00cc66, emoji:'🔭', description:'Streams logs, protects CloudTrail and GuardDuty, streams Defender data',     guardrails:'G.04.01–G.04.04' },
-  tag_region_lock: { name:'Tag & Region Lock',domain:'GRC',             cost:55,  color:0x009966, emoji:'📍', description:'Enforces reserved tags, restricts regions, limits allowed SKUs',             guardrails:'G.04.05, G.04.08, G.04.10' },
+  https_enforcer:  { name:'HTTPS Enforcer',   domain:'Network',         cost:50,  range:2, color:0x00aaff, emoji:'🔒', description:'Enforces TLS 1.2+ and blocks plain HTTP traffic',                             guardrails:'G.01.01, G.01.08' },
+  perimeter_wall:  { name:'Perimeter Wall',   domain:'Network',         cost:75,  range:2, color:0x0066cc, emoji:'🧱', description:'Blocks public access, prevents default VPCs and rogue NATs',                 guardrails:'G.01.04, G.01.06, G.01.07' },
+  encryption_vault:{ name:'Encryption Vault', domain:'Data Protection', cost:60,  range:2, color:0xffaa00, emoji:'🔐', description:'Encrypts everything at rest and in transit',                                  guardrails:'G.02.01, G.02.02' },
+  key_warden:      { name:'Key Warden',       domain:'Data Protection', cost:80,  range:2, color:0xff6600, emoji:'🗝️', description:'Prevents cross-tenant replication, expires stale keys',                      guardrails:'G.02.04, G.02.06' },
+  iam_sentinel:    { name:'IAM Sentinel',     domain:'IAM',             cost:100, range:2, color:0xcc00cc, emoji:'🛡️', description:'Prevents IAM user creation, denies root access, protects central roles',     guardrails:'G.03.01, G.03.07, G.03.08' },
+  identity_gate:   { name:'Identity Gate',    domain:'IAM',             cost:70,  range:2, color:0x9900cc, emoji:'🚪', description:'Enforces IMDSv2, blocks anonymous access, requires Entra ID auth',           guardrails:'G.03.03, G.03.05, G.03.06' },
+  watchtower:      { name:'Watchtower',       domain:'GRC',             cost:90,  range:3, color:0x00cc66, emoji:'🔭', description:'Streams logs, protects CloudTrail and GuardDuty, streams Defender data',     guardrails:'G.04.01–G.04.04' },
+  tag_region_lock: { name:'Tag & Region Lock',domain:'GRC',             cost:55,  range:2, color:0x009966, emoji:'📍', description:'Enforces reserved tags, restricts regions, limits allowed SKUs',             guardrails:'G.04.05, G.04.08, G.04.10' },
 };
 
 const DOMAIN_COLORS = {
@@ -431,7 +431,7 @@ function renderTowerShop() {
 
 function showTowerTooltip(t, e) {
   const tt = document.getElementById('tower-tooltip');
-  tt.innerHTML = `<strong>${t.name}</strong>${t.description}<div class="tt-ids">${t.guardrails}</div>`;
+  tt.innerHTML = `<strong>${t.name}</strong>${t.description}<div class="tt-range">Range: ${t.range} tiles</div><div class="tt-ids">${t.guardrails}</div>`;
   tt.style.display = 'block';
   tt.style.left = (e.clientX - 220) + 'px';
   tt.style.top = e.clientY + 'px';
@@ -774,7 +774,7 @@ function drawPlacementPreview() {
 
   // Range indicator
   if (canPlace && TOWERS_DEF[selectedTower]) {
-    const range = 2 * CELL;
+    const range = (TOWERS_DEF[selectedTower]?.range ?? 2) * CELL;
     placementPreview.lineStyle(1, 0x00ff88, 0.2);
     placementPreview.strokeCircle(c * CELL + CELL/2, r * CELL + CELL/2, range);
   }

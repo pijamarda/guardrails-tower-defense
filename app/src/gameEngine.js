@@ -280,7 +280,7 @@ class GameEngine {
 
     // Reward split equally among all connected players
     const playerList = Object.values(this.state.players);
-    const share = Math.max(1, Math.floor(enemy.reward / playerList.length));
+    const share = Math.max(2, Math.floor(enemy.reward / playerList.length));
     for (const player of playerList) {
       player.currency += share;
     }
@@ -316,7 +316,7 @@ class GameEngine {
       waveNumber: wave.number,
       theme: wave.theme,
       teachingMoment: wave.teachingMoment,
-      players: this.getLeaderboard(),
+      players: this.getPublicPlayers(),
       lives: this.state.lives,
       score: this.state.score,
     });

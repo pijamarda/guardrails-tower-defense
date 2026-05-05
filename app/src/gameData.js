@@ -187,7 +187,7 @@ const ENEMIES = {
     id: 'shadow_admin',
     name: 'Shadow Admin',
     hp: 600,
-    speed: 25,
+    speed: 45,
     livesDamage: 5,
     reward: 80,
     color: 0x880000,
@@ -255,8 +255,8 @@ const WAVES = [
     theme: 'Dark Activity',
     teachingMoment: 'Watchtower guardrails ensure nothing goes unlogged — unmonitored resources are attackers\' best friends.',
     enemies: [
-      { type: 'unlogged_resource', count: 7, interval: 1600 },
-      { type: 'rogue_iam_user', count: 4, interval: 2000 },
+      { type: 'unlogged_resource', count: 9, interval: 1600 },
+      { type: 'rogue_iam_user', count: 6, interval: 2000 },
     ],
   },
   {
